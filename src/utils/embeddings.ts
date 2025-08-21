@@ -1,0 +1,33 @@
+import { OpenAI } from 'openai';
+import config from '../config';
+
+const openai = new OpenAI({
+    apiKey: config.openai.apiKey
+});
+
+export async function generateEmbedding(text: string): Promise<number[]> {
+    try {
+        // Limite o tamanho do texto se for muito grande
+        const truncatedText = text.slice(0, 8000); // Limitar para não exceder limites da API
+
+        console.log(`Gerando embedding para texto de ${truncatedText.length} caracteres`);
+
+        const response = await openai.embeddings.create({
+            model: config.openai.embeddingModel, // Certifique-se de que é 'text-embedding-3-large'
+            input: truncatedText
+        });
+
+        const embedding = response.data[0].embedding;
+        console.log(`Tamanho do embedding gerado: ${embedding.length}`);
+
+        // Verificar se o tamanho do embedding corresponde ao esperado
+        if (embedding.length !== 1536) {
+            console.warn(`AVISO: O embedding gerado tem ${embedding.length} dimensões, mas a coleção espera 1536 dimensões`);
+        }
+
+        return embedding;
+    } catch (error) {
+        console.error('Erro ao gerar embedding:', error);
+        throw new Error('Falha ao gerar embedding');
+    }
+}

@@ -1,0 +1,6 @@
+# IGNORE FILES
+
+.env
+*node_modules*
+*dist*
+.claude
