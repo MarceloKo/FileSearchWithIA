@@ -14,14 +14,28 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
         properties: {
             success: { type: 'boolean' },
             data: {
-                type: 'object',
-                properties: {
-                    filename: { type: 'string' },
-                    mimeType: { type: 'string' },
-                    fileUrl: { type: 'string' },
-                    extractedText: { type: 'string' },
-                    chunks: { type: 'number' },
-                    metadata: { type: 'object' }
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        filename: { type: 'string' },
+                        mimeType: { type: 'string' },
+                        fileUrl: { type: 'string' },
+                        extractedText: { type: 'string' },
+                        chunks: { type: 'number' },
+                        metadata: { type: 'object' }
+                    }
+                }
+            },
+            totalFiles: { type: 'number' },
+            failedFiles: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        filename: { type: 'string' },
+                        error: { type: 'string' }
+                    }
                 }
             }
         }
@@ -48,7 +62,7 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
     // Register routes
     fastify.post('/api/files/upload', {
         schema: {
-            description: 'Upload and process a file (PDF, Word, Excel, Text)',
+            description: 'Upload and process multiple files (PDF, Word, Excel, Text)',
             tags: ['files'],
             response: {
                 200: uploadResponseSchema
@@ -56,22 +70,55 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
         },
         handler: async (request: FastifyRequest, reply: FastifyReply) => {
             try {
-                const data = await request.file();
+                const parts = request.files();
+                const processedFiles = [];
+                const failedFiles = [];
+                const MAX_FILES = 10;
+                let fileCount = 0;
 
-                if (!data) {
-                    return reply.code(400).send({ success: false, error: 'No file uploaded' });
+                for await (const part of parts) {
+                    fileCount++;
+                    
+                    if (fileCount > MAX_FILES) {
+                        failedFiles.push({
+                            filename: part.filename,
+                            error: `Maximum number of files (${MAX_FILES}) exceeded`
+                        });
+                        continue;
+                    }
+
+                    try {
+                        const buffer = await part.toBuffer();
+                        const result = await fileService.processFile(
+                            buffer,
+                            part.filename,
+                            part.mimetype
+                        );
+                        processedFiles.push(result);
+                    } catch (error) {
+                        console.error(`Error processing file ${part.filename}:`, error);
+                        failedFiles.push({
+                            filename: part.filename,
+                            error: error instanceof Error ? error.message : 'Unknown error'
+                        });
+                    }
                 }
 
-                const buffer = await data.toBuffer();
-                const result = await fileService.processFile(
-                    buffer,
-                    data.filename,
-                    data.mimetype
-                );
+                if (processedFiles.length === 0 && failedFiles.length === 0) {
+                    return reply.code(400).send({ 
+                        success: false, 
+                        error: 'No files uploaded' 
+                    });
+                }
 
-                return reply.code(200).send({ success: true, data: result });
+                return reply.code(200).send({ 
+                    success: true, 
+                    data: processedFiles,
+                    totalFiles: processedFiles.length + failedFiles.length,
+                    failedFiles: failedFiles
+                });
             } catch (error) {
-                console.error('Error uploading file:', error);
+                console.error('Error uploading files:', error);
                 return reply.code(500).send({
                     success: false,
                     error: error instanceof Error ? error.message : 'Unknown error'

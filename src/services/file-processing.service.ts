@@ -34,6 +34,12 @@ export class FileProcessingService {
 
     async processFile(buffer: Buffer, filename: string, mimeType: string): Promise<ProcessedFile> {
         try {
+
+            // ACCEPT text files only .TXT OR .MD
+            if (mimeType !== 'text/plain' && mimeType !== 'text/markdown') {
+                throw new Error('Only text files are supported');
+            }
+
             // 1. Extract text from the file
             const extractedData: ExtractedText = await extractTextFromBuffer(buffer, filename, mimeType);
 
