@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
+    "start:prod": "node ./server.js",
     "dev": "ts-node-dev --respawn src/server.ts"
   },
   "dependencies": {
