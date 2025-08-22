@@ -34,7 +34,9 @@ export default async function aiRoutes(fastify: FastifyInstance, options: any) {
             body: {
                 type: 'object',
                 properties: {
-                    query: { type: 'string' }
+                    query: { type: 'string' },
+                    useHybridSearch: { type: 'boolean', default: true },
+                    alpha: { type: 'number', default: 0.5, minimum: 0, maximum: 1 }
                 },
                 required: ['query']
             },
@@ -43,11 +45,11 @@ export default async function aiRoutes(fastify: FastifyInstance, options: any) {
             }
         },
         handler: async (request: FastifyRequest<{
-            Body: { query: string }
+            Body: { query: string; useHybridSearch?: boolean; alpha?: number }
         }>, reply: FastifyReply) => {
             try {
-                const { query } = request.body;
-                const response = await aiService.chatWithAI(query);
+                const { query, useHybridSearch = true, alpha = 0.5 } = request.body;
+                const response = await aiService.chatWithAI(query, useHybridSearch, alpha);
 
                 return reply.code(200).send({
                     success: true,

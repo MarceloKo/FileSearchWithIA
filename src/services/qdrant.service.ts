@@ -3,6 +3,7 @@ import config from '../config';
 import { TextChunk } from '../utils/chunking';
 import { generateEmbedding } from '../utils/embeddings';
 import { randomUUID } from 'crypto';
+import { sparseVectorService, SparseVector } from './sparse-vector.service';
 
 export interface SearchResult {
     id: string;
@@ -34,11 +35,20 @@ export class QdrantService {
 
                 console.log(`Dimensão do embedding detectada: ${vectorSize}`);
 
-                // Criar coleção com a dimensão correta
+                // Criar coleção com vetores nomeados para busca híbrida
                 await this.client.createCollection(config.qdrant.collection, {
                     vectors: {
-                        size: vectorSize, // Usar a dimensão real do embedding
-                        distance: 'Cosine'
+                        dense: {
+                            size: vectorSize,
+                            distance: 'Cosine'
+                        }
+                    },
+                    sparse_vectors: {
+                        sparse: {
+                            index: {
+                                on_disk: false
+                            }
+                        }
                     },
                     optimizers_config: {
                         default_segment_number: 2
@@ -61,15 +71,22 @@ export class QdrantService {
     async upsertVectors(chunks: TextChunk[], fileUrl: string): Promise<void> {
         try {
             const points = await Promise.all(
-                chunks.map(async (chunk, index) => {
-                    const embedding = await generateEmbedding(chunk.text);
-                    console.log(`Generated embedding for chunk ${index + 1}:`, embedding);
-                    // Gerar um UUID válido para o ponto em vez de usar uma string com hífens
-                    // Você precisará adicionar a biblioteca uuid: npm install uuid @types/uuid
+                chunks.map(async (chunk: TextChunk, index: number) => {
+                    const denseEmbedding = await generateEmbedding(chunk.text);
+                    const sparseVector = sparseVectorService.createSparseVector(chunk.text);
+
+                    console.log(`Generated embeddings for chunk ${index + 1}`);
                     const pointId = randomUUID();
+
                     return {
                         id: pointId,
-                        vector: embedding,
+                        vector: {
+                            dense: denseEmbedding,
+                            sparse: {
+                                indices: sparseVector.indices,
+                                values: sparseVector.values
+                            }
+                        },
                         payload: {
                             text: chunk.text,
                             metadata: {
@@ -81,12 +98,12 @@ export class QdrantService {
                 })
             );
             console.log(`Enviando ${points.length} pontos para o Qdrant...`);
-            console.log(`Tamanho do vetor do primeiro ponto: ${points[0].vector.length}`);
+            console.log(`Tamanho do vetor denso do primeiro ponto: ${points[0].vector.dense.length}`);
 
             // Batch upsert to Qdrant
             await this.client.upsert(config.qdrant.collection, {
                 wait: true,
-                points
+                points: points
             });
 
             console.log(`Successfully indexed ${points.length} chunks from file`);
@@ -106,18 +123,18 @@ export class QdrantService {
 
     async searchSimilar(query: string, filter?: any, limit: number = 5): Promise<SearchResult[]> {
         try {
-            // Generate embedding for query
             const queryEmbedding = await generateEmbedding(query);
 
-            // Search Qdrant
             const searchParams: any = {
-                vector: queryEmbedding,
+                vector: {
+                    name: 'dense',
+                    vector: queryEmbedding
+                },
                 limit: limit,
                 with_payload: true,
                 with_vectors: false
             };
 
-            // Add filter if provided
             if (filter) {
                 searchParams.filter = filter;
             }
@@ -132,6 +149,90 @@ export class QdrantService {
         } catch (error) {
             console.error('Error searching Qdrant:', error);
             throw new Error('Failed to search vector database');
+        }
+    }
+
+    async hybridSearch(query: string, filter?: any, limit: number = 5, alpha: number = 0.5): Promise<SearchResult[]> {
+        try {
+            const [denseEmbedding, sparseVector] = await Promise.all([
+                generateEmbedding(query),
+                Promise.resolve(sparseVectorService.createQueryVector(query))
+            ]);
+
+            const denseSearchParams: any = {
+                vector: {
+                    name: 'dense',
+                    vector: denseEmbedding
+                },
+                limit: limit * 2,
+                with_payload: true,
+                with_vectors: false
+            };
+
+            const sparseSearchParams: any = {
+                vector: {
+                    name: 'sparse',
+                    vector: {
+                        indices: sparseVector.indices,
+                        values: sparseVector.values
+                    }
+                },
+                limit: limit * 2,
+                with_payload: true,
+                with_vectors: false
+            };
+
+            if (filter) {
+                denseSearchParams.filter = filter;
+                sparseSearchParams.filter = filter;
+            }
+
+            const [denseResults, sparseResults] = await Promise.all([
+                this.client.search(config.qdrant.collection, denseSearchParams),
+                this.client.search(config.qdrant.collection, sparseSearchParams)
+            ]);
+
+            const scoreMap = new Map<string, { payload: any, denseScore: number, sparseScore: number }>();
+
+            for (const result of denseResults) {
+                const id = String(result.id);
+                scoreMap.set(id, {
+                    payload: result.payload,
+                    denseScore: result.score,
+                    sparseScore: 0
+                });
+            }
+
+            for (const result of sparseResults) {
+                const id = String(result.id);
+                const existing = scoreMap.get(id);
+                if (existing) {
+                    existing.sparseScore = result.score;
+                } else {
+                    scoreMap.set(id, {
+                        payload: result.payload,
+                        denseScore: 0,
+                        sparseScore: result.score
+                    });
+                }
+            }
+
+            const hybridResults: SearchResult[] = [];
+            for (const [id, data] of scoreMap) {
+                const hybridScore = alpha * data.denseScore + (1 - alpha) * data.sparseScore;
+                hybridResults.push({
+                    id,
+                    payload: data.payload,
+                    score: hybridScore
+                });
+            }
+
+            hybridResults.sort((a, b) => b.score - a.score);
+
+            return hybridResults.slice(0, limit);
+        } catch (error) {
+            console.error('Error performing hybrid search:', error);
+            throw new Error('Failed to perform hybrid search');
         }
     }
 }

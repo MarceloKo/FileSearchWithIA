@@ -114,5 +114,40 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
         }
     });
 
+    fastify.get('/api/files/hybrid-search', {
+        schema: {
+            description: 'Hybrid search (dense + sparse vectors) for files based on content',
+            tags: ['files'],
+            querystring: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string' },
+                    limit: { type: 'number', default: 5 },
+                    alpha: { type: 'number', default: 0.5, minimum: 0, maximum: 1 }
+                },
+                required: ['query']
+            },
+            response: {
+                200: searchResponseSchema
+            }
+        },
+        handler: async (request: FastifyRequest<{
+            Querystring: { query: string; limit?: number; alpha?: number }
+        }>, reply: FastifyReply) => {
+            try {
+                const { query, limit = 5, alpha = 0.5 } = request.query;
+                const results = await fileService.hybridSearchFiles(query, undefined, limit, alpha);
+
+                return reply.code(200).send({ success: true, results });
+            } catch (error) {
+                console.error('Error performing hybrid search:', error);
+                return reply.code(500).send({
+                    success: false,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                });
+            }
+        }
+    });
+
 
 }

@@ -16,9 +16,11 @@ export class AIService {
         this.minioService = new MinioService();
     }
 
-    async chatWithAI(query: string): Promise<{ answer: string, sources: any[] }> {
+    async chatWithAI(query: string, useHybridSearch: boolean = true, alpha: number = 0.5): Promise<{ answer: string, sources: any[] }> {
         try {
-            const searchResults = await this.qdrantService.searchSimilar(query);
+            const searchResults = useHybridSearch 
+                ? await this.qdrantService.hybridSearch(query, undefined, 5, alpha)
+                : await this.qdrantService.searchSimilar(query);
 
             if (searchResults.length === 0) {
                 return {

@@ -3,6 +3,7 @@ import { chunkText, TextChunk } from '../utils/chunking';
 import { SmartChunker, SmartChunk } from '../utils/smart-chunking';
 import { MinioService } from './minio.service';
 import { QdrantService, SearchResult } from './qdrant.service';
+import { sparseVectorService } from './sparse-vector.service';
 import config from '../config';
 
 export interface ProcessedFile {
@@ -46,10 +47,15 @@ export class FileProcessingService {
                 config.chunking.chunkOverlap
             );
 
-            // 4. Generate embeddings and store in Qdrant
+            // 4. Add document to sparse vector vocabulary
+            chunks.forEach(chunk => {
+                sparseVectorService.addDocument(chunk.text);
+            });
+
+            // 5. Generate embeddings and store in Qdrant
             await this.qdrantService.upsertVectors(chunks, fileUrl);
 
-            // 5. Return the processing result
+            // 6. Return the processing result
             return {
                 filename,
                 mimeType,
@@ -66,5 +72,9 @@ export class FileProcessingService {
 
     async searchFiles(query: string, filters?: any): Promise<SearchResult[]> {
         return await this.qdrantService.searchSimilar(query, filters);
+    }
+
+    async hybridSearchFiles(query: string, filters?: any, limit: number = 5, alpha: number = 0.5): Promise<SearchResult[]> {
+        return await this.qdrantService.hybridSearch(query, filters, limit, alpha);
     }
 }
