@@ -62,7 +62,7 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
     // Register routes
     fastify.post('/api/files/upload', {
         schema: {
-            description: 'Upload and process multiple files (PDF, Word, Excel, Text)',
+            description: 'Upload and process multiple files with optional metadata (path_file_external, idempotency)',
             tags: ['files'],
             response: {
                 200: uploadResponseSchema
@@ -70,37 +70,57 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
         },
         handler: async (request: FastifyRequest, reply: FastifyReply) => {
             try {
-                const parts = request.files();
+                const parts = request.parts();
                 const processedFiles = [];
                 const failedFiles = [];
                 const MAX_FILES = 10;
                 let fileCount = 0;
+                let customMetadata: any = {};
 
                 for await (const part of parts) {
-                    fileCount++;
-                    
-                    if (fileCount > MAX_FILES) {
-                        failedFiles.push({
-                            filename: part.filename,
-                            error: `Maximum number of files (${MAX_FILES}) exceeded`
-                        });
-                        continue;
-                    }
+                    if (part.type === 'field') {
+                        // Processar campos de metadados
+                        if (part.fieldname === 'metadata') {
+                            try {
+                                customMetadata = JSON.parse(part.value as string);
+                            } catch (e) {
+                                console.error('Error parsing metadata JSON:', e);
+                            }
+                        } else if (part.fieldname === 'path_file_external') {
+                            customMetadata.path_file_external = part.value;
+                        } else if (part.fieldname === 'idempotency') {
+                            customMetadata.idempotency = part.value;
+                        } else {
+                            // Aceitar outros campos como metadados adicionais
+                            customMetadata[part.fieldname] = part.value;
+                        }
+                    } else if (part.type === 'file') {
+                        fileCount++;
+                        
+                        if (fileCount > MAX_FILES) {
+                            failedFiles.push({
+                                filename: part.filename,
+                                error: `Maximum number of files (${MAX_FILES}) exceeded`
+                            });
+                            continue;
+                        }
 
-                    try {
-                        const buffer = await part.toBuffer();
-                        const result = await fileService.processFile(
-                            buffer,
-                            part.filename,
-                            part.mimetype
-                        );
-                        processedFiles.push(result);
-                    } catch (error) {
-                        console.error(`Error processing file ${part.filename}:`, error);
-                        failedFiles.push({
-                            filename: part.filename,
-                            error: error instanceof Error ? error.message : 'Unknown error'
-                        });
+                        try {
+                            const buffer = await part.toBuffer();
+                            const result = await fileService.processFile(
+                                buffer,
+                                part.filename,
+                                part.mimetype,
+                                customMetadata
+                            );
+                            processedFiles.push(result);
+                        } catch (error) {
+                            console.error(`Error processing file ${part.filename}:`, error);
+                            failedFiles.push({
+                                filename: part.filename,
+                                error: error instanceof Error ? error.message : 'Unknown error'
+                            });
+                        }
                     }
                 }
 

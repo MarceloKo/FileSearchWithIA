@@ -7,13 +7,12 @@ const openai = new OpenAI({
 
 export async function generateEmbedding(text: string): Promise<number[]> {
     try {
-        // Limite o tamanho do texto se for muito grande
-        const truncatedText = text.slice(0, 8000); // Limitar para não exceder limites da API
+        const truncatedText = text.slice(0, 8000);
 
         console.log(`Gerando embedding para texto de ${truncatedText.length} caracteres`);
 
         const response = await openai.embeddings.create({
-            model: config.openai.embeddingModel, // Certifique-se de que é 'text-embedding-3-large'
+            model: config.openai.embeddingModel,
             input: truncatedText
         });
 

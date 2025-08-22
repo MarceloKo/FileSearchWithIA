@@ -68,14 +68,14 @@ export class QdrantService {
         }
     }
 
-    async upsertVectors(chunks: TextChunk[], fileUrl: string): Promise<void> {
+    async upsertVectors(chunks: TextChunk[], fileUrl: string, customMetadata?: any): Promise<void> {
         try {
             const points = await Promise.all(
                 chunks.map(async (chunk: TextChunk, index: number) => {
                     const denseEmbedding = await generateEmbedding(chunk.text);
                     const sparseVector = sparseVectorService.createSparseVector(chunk.text);
 
-                    console.log(`Generated embeddings for chunk ${index + 1}`);
+                    // console.log(`Generated embeddings for chunk ${index + 1}`);
                     const pointId = randomUUID();
 
                     return {
@@ -91,7 +91,8 @@ export class QdrantService {
                             text: chunk.text,
                             metadata: {
                                 ...chunk.metadata,
-                                fileUrl
+                                fileUrl,
+                                ...customMetadata
                             }
                         }
                     };

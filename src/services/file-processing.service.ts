@@ -15,6 +15,12 @@ export interface ProcessedFile {
     metadata: any;
 }
 
+export interface CustomMetadata {
+    path_file_external?: string;
+    idempotency?: string;
+    [key: string]: any;
+}
+
 export class FileProcessingService {
     private minioService: MinioService;
     private qdrantService: QdrantService;
@@ -32,7 +38,7 @@ export class FileProcessingService {
         await this.qdrantService.initialize();
     }
 
-    async processFile(buffer: Buffer, filename: string, mimeType: string): Promise<ProcessedFile> {
+    async processFile(buffer: Buffer, filename: string, mimeType: string, customMetadata?: CustomMetadata): Promise<ProcessedFile> {
         try {
 
             // ACCEPT text files only .TXT OR .MD
@@ -44,7 +50,7 @@ export class FileProcessingService {
             const extractedData: ExtractedText = await extractTextFromBuffer(buffer, filename, mimeType);
 
             // 2. Upload the original file to MinIO
-            const fileUrl = await this.minioService.uploadFile(buffer, filename, mimeType);
+            const fileUrl = ""//await this.minioService.uploadFile(buffer, filename, mimeType); 
 
             // 3. Chunk the text
             const chunks: TextChunk[] = chunkText(
@@ -58,8 +64,7 @@ export class FileProcessingService {
                 sparseVectorService.addDocument(chunk.text);
             });
 
-            // 5. Generate embeddings and store in Qdrant
-            await this.qdrantService.upsertVectors(chunks, fileUrl);
+            await this.qdrantService.upsertVectors(chunks, fileUrl, customMetadata);
 
             // 6. Return the processing result
             return {
@@ -68,7 +73,7 @@ export class FileProcessingService {
                 fileUrl,
                 extractedText: extractedData.text.substring(0, 200) + '...', // Preview only
                 chunks: chunks.length,
-                metadata: extractedData.metadata
+                metadata: { ...extractedData.metadata, ...customMetadata }
             };
         } catch (error) {
             console.error('Error processing file:', error);
