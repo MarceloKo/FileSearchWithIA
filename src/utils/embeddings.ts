@@ -9,15 +9,12 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     try {
         const truncatedText = text.slice(0, 8000);
 
-        console.log(`Gerando embedding para texto de ${truncatedText.length} caracteres`);
-
         const response = await openai.embeddings.create({
             model: config.openai.embeddingModel,
             input: truncatedText
         });
 
         const embedding = response.data[0].embedding;
-        console.log(`Tamanho do embedding gerado: ${embedding.length}`);
 
         // Verificar se o tamanho do embedding corresponde ao esperado
         if (embedding.length !== 1536) {

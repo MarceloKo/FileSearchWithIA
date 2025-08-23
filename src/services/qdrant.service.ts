@@ -70,6 +70,7 @@ export class QdrantService {
 
     async upsertVectors(chunks: TextChunk[], fileUrl: string, customMetadata?: any): Promise<void> {
         try {
+            console.log(`Enviando chunks ${chunks.length} para embedding..`);
             const points = await Promise.all(
                 chunks.map(async (chunk: TextChunk, index: number) => {
                     const denseEmbedding = await generateEmbedding(chunk.text);

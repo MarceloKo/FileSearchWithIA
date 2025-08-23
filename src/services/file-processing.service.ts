@@ -53,6 +53,7 @@ export class FileProcessingService {
             const fileUrl = ""//await this.minioService.uploadFile(buffer, filename, mimeType); 
 
             // 3. Chunk the text
+            console.log(`Chunking text...`, new Date().toISOString());
             const chunks: TextChunk[] = chunkText(
                 extractedData,
                 config.chunking.chunkSize,
@@ -60,10 +61,12 @@ export class FileProcessingService {
             );
 
             // 4. Add document to sparse vector vocabulary
+            console.log(`Adding document to sparse vector vocabulary...`, new Date().toISOString());
             chunks.forEach(chunk => {
                 sparseVectorService.addDocument(chunk.text);
             });
 
+            console.log(`Upserting vectors to Qdrant...`, new Date().toISOString());
             await this.qdrantService.upsertVectors(chunks, fileUrl, customMetadata);
 
             // 6. Return the processing result
