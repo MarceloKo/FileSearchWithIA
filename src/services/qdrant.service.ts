@@ -72,7 +72,7 @@ export class QdrantService {
         try {
             console.log(`🚀 Processando ${chunks.length} chunks em lotes para embedding... ${new Date().toISOString()}`);
 
-            const OPENAI_BATCH_SIZE = 500;
+            const OPENAI_BATCH_SIZE = 400;
             const allPoints: any[] = [];
 
             for (let i = 0; i < chunks.length; i += OPENAI_BATCH_SIZE) {
