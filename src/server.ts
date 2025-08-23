@@ -8,7 +8,7 @@ const start = async () => {
 
         await app.listen({
             port: config.server.port,
-            host: config.server.host
+            host: '0.0.0.0'
         });
 
         console.log(`Server is running on http://${config.server.host}:${config.server.port}`);
