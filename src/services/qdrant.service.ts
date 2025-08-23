@@ -1,7 +1,7 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import config from '../config';
 import { TextChunk } from '../utils/chunking';
-import { generateEmbedding } from '../utils/embeddings';
+import { generateEmbedding, generateBatchEmbeddings } from '../utils/embeddings';
 import { randomUUID } from 'crypto';
 import { sparseVectorService, SparseVector } from './sparse-vector.service';
 
@@ -70,19 +70,29 @@ export class QdrantService {
 
     async upsertVectors(chunks: TextChunk[], fileUrl: string, customMetadata?: any): Promise<void> {
         try {
-            console.log(`Enviando chunks ${chunks.length} para embedding.. ${new Date().toISOString()}`);
-            const points = await Promise.all(
-                chunks.map(async (chunk: TextChunk, index: number) => {
-                    const denseEmbedding = await generateEmbedding(chunk.text);
-                    const sparseVector = sparseVectorService.createSparseVector(chunk.text);
+            console.log(`🚀 Processando ${chunks.length} chunks em lotes para embedding... ${new Date().toISOString()}`);
 
-                    // console.log(`Generated embeddings for chunk ${index + 1}`);
+            const OPENAI_BATCH_SIZE = 500;
+            const allPoints: any[] = [];
+
+            for (let i = 0; i < chunks.length; i += OPENAI_BATCH_SIZE) {
+                const chunkBatch = chunks.slice(i, i + OPENAI_BATCH_SIZE);
+                const batchNum = Math.floor(i / OPENAI_BATCH_SIZE) + 1;
+                const totalBatches = Math.ceil(chunks.length / OPENAI_BATCH_SIZE);
+
+                console.log(`📦 Processando lote ${batchNum}/${totalBatches} (${chunkBatch.length} chunks)...`);
+
+                const texts = chunkBatch.map(chunk => chunk.text);
+                const denseEmbeddings = await generateBatchEmbeddings(texts);
+
+                const batchPoints = chunkBatch.map((chunk: TextChunk, index: number) => {
+                    const sparseVector = sparseVectorService.createSparseVector(chunk.text);
                     const pointId = randomUUID();
 
                     return {
                         id: pointId,
                         vector: {
-                            dense: denseEmbedding,
+                            dense: denseEmbeddings[index],
                             sparse: {
                                 indices: sparseVector.indices,
                                 values: sparseVector.values
@@ -97,25 +107,27 @@ export class QdrantService {
                             }
                         }
                     };
-                })
-            );
-            console.log(`Enviando ${points.length} pontos para o Qdrant... ${new Date().toISOString()}`);
-            console.log(`Tamanho do vetor denso do primeiro ponto: ${points[0].vector.dense.length}`);
+                });
 
-            // Batch upsert to Qdrant
+                allPoints.push(...batchPoints);
+                console.log(`✅ Lote ${batchNum} processado com sucesso`);
+            }
+
+            console.log(`🎯 Enviando ${allPoints.length} pontos para o Qdrant... ${new Date().toISOString()}`);
+            console.log(`📏 Tamanho do vetor denso: ${allPoints[0].vector.dense.length} dimensões`);
+
             await this.client.upsert(config.qdrant.collection, {
                 wait: true,
-                points: points
+                points: allPoints
             });
 
-            console.log(`Successfully indexed ${points.length} chunks from file`);
+            console.log(`🎉 Successfully indexed ${allPoints.length} chunks from file`);
         } catch (error) {
-            console.error('Erro ao enviar vetores para o Qdrant:', error);
+            console.error('❌ Erro ao enviar vetores para o Qdrant:', error);
 
-            // Adicionar detalhes extras para debugging
             if (error instanceof Error) {
                 if ('data' in error && typeof error.data === 'object' && error.data !== null) {
-                    console.error('Detalhes do erro:', error.data);
+                    console.error('📋 Detalhes do erro:', error.data);
                 }
             }
 
