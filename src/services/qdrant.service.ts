@@ -70,7 +70,7 @@ export class QdrantService {
 
     async upsertVectors(chunks: TextChunk[], fileUrl: string, customMetadata?: any): Promise<void> {
         try {
-            console.log(`Enviando chunks ${chunks.length} para embedding..`);
+            console.log(`Enviando chunks ${chunks.length} para embedding.. ${new Date().toISOString()}`);
             const points = await Promise.all(
                 chunks.map(async (chunk: TextChunk, index: number) => {
                     const denseEmbedding = await generateEmbedding(chunk.text);
@@ -99,7 +99,7 @@ export class QdrantService {
                     };
                 })
             );
-            console.log(`Enviando ${points.length} pontos para o Qdrant...`);
+            console.log(`Enviando ${points.length} pontos para o Qdrant... ${new Date().toISOString()}`);
             console.log(`Tamanho do vetor denso do primeiro ponto: ${points[0].vector.dense.length}`);
 
             // Batch upsert to Qdrant
