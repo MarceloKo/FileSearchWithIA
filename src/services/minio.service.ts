@@ -16,23 +16,23 @@ export class MinioService {
 
     async initialize(): Promise<void> {
         try {
-            console.log("Attempting to connect to MinIO server...");
+            console.log("Tentando conectar ao servidor MinIO...");
 
             // Check if bucket exists
             const bucketExists = await this.client.bucketExists(config.minio.bucketName);
 
             if (!bucketExists) {
                 await this.client.makeBucket(config.minio.bucketName, 'us-east-1');
-                console.log(`Bucket '${config.minio.bucketName}' created successfully`);
+                console.log(`Bucket '${config.minio.bucketName}' criado com sucesso`);
             } else {
-                console.log(`Bucket '${config.minio.bucketName}' already exists`);
+                console.log(`Bucket '${config.minio.bucketName}' já existe`);
             }
         } catch (error) {
-            console.error("MinIO initialization error:", error);
-            console.warn("MinIO service could not connect to the server. Please ensure MinIO is running.");
+            console.error("Erro de inicialização do MinIO:", error);
+            console.warn("Serviço MinIO não conseguiu conectar ao servidor. Certifique-se de que o MinIO está em execução.");
             // You might want to decide if you want to throw or swallow the error based on your app requirements
             // For now, we'll rethrow to prevent the app from starting if MinIO isn't available
-            throw new Error("Failed to initialize MinIO service. Is the MinIO server running?");
+            throw new Error("Falha ao inicializar serviço MinIO. O servidor MinIO está em execução?");
         }
     }
 
@@ -52,8 +52,8 @@ export class MinioService {
             // Return the URL to access the file
             return objectName;
         } catch (error) {
-            console.error("Error uploading file to MinIO:", error);
-            throw new Error(`Failed to upload file to storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error("Erro ao fazer upload do arquivo para MinIO:", error);
+            throw new Error(`Falha ao fazer upload do arquivo para armazenamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
     }
 
@@ -61,8 +61,8 @@ export class MinioService {
         try {
             return await this.client.presignedGetObject(config.minio.bucketName, objectName, 24 * 60 * 60); // 24 hours expiry
         } catch (error) {
-            console.error("Error generating presigned URL:", error);
-            throw new Error(`Failed to generate file URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error("Erro ao gerar URL assinada:", error);
+            throw new Error(`Falha ao gerar URL do arquivo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
     }
 
@@ -93,8 +93,8 @@ export class MinioService {
                 });
             });
         } catch (error) {
-            console.error('Error getting file from MinIO:', error);
-            throw new Error(`Failed to retrieve file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error('Erro ao obter arquivo do MinIO:', error);
+            throw new Error(`Falha ao recuperar arquivo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
     }
 
@@ -108,8 +108,8 @@ export class MinioService {
 
             return stat;
         } catch (error) {
-            console.error('Error getting file metadata from MinIO:', error);
-            throw new Error(`Failed to retrieve file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error('Erro ao obter metadados do arquivo do MinIO:', error);
+            throw new Error(`Falha ao recuperar metadados do arquivo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
     }
 }

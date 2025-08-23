@@ -11,10 +11,10 @@ const start = async () => {
             host: '0.0.0.0'
         });
 
-        console.log(`Server is running on http://${config.server.host}:${config.server.port}`);
-        console.log(`API documentation available at http://${config.server.host}:${config.server.port}/docs`);
+        console.log(`Servidor está executando em http://${config.server.host}:${config.server.port}`);
+        console.log(`Documentação da API disponível em http://${config.server.host}:${config.server.port}/docs`);
     } catch (err) {
-        console.error("Failed to start server:", err);
+        console.error("Falha ao iniciar servidor:", err);
         process.exit(1);
     }
 };

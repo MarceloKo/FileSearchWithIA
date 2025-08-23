@@ -142,7 +142,7 @@ export async function extractTextFromBuffer(
     } else if (mimeType === 'text/plain') {
         text = buffer.toString('utf-8');
     } else {
-        throw new Error(`Unsupported file type: ${mimeType}`);
+        throw new Error(`Tipo de arquivo não suportado: ${mimeType}`);
     }
 
     // Compute basic metadata

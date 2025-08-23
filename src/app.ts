@@ -52,7 +52,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     // Check if required services are running before starting the app
     try {
-        console.log("Initializing services...");
+        console.log("Inicializando serviços...");
 
         // Check MinIO
         const minioService = new MinioService();
@@ -62,10 +62,10 @@ export async function buildApp(): Promise<FastifyInstance> {
         const qdrantService = new QdrantService();
         await qdrantService.initialize();
 
-        console.log("All services initialized successfully");
+        console.log("Todos os serviços inicializados com sucesso");
     } catch (error) {
-        console.error("Service initialization failed:", error);
-        app.log.error("Failed to initialize required services. Please check your configuration and ensure all services are running.");
+        console.error("Falha na inicialização dos serviços:", error);
+        app.log.error("Falha ao inicializar serviços necessários. Verifique sua configuração e certifique-se de que todos os serviços estão em execução.");
         // We'll continue loading the app, but it might not function properly
     }
 
@@ -75,7 +75,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     // Root route
     app.get('/', async (request, reply) => {
-        return { status: 'ok', message: 'Document Processing API is running' };
+        return { status: 'ok', message: 'API de Processamento de Documentos está executando' };
     });
 
     return app;

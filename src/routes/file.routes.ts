@@ -75,14 +75,15 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
                 const failedFiles = [];
                 const MAX_FILES = 10;
                 let fileCount = 0;
-                let customMetadata: any = {};
+                let customMetadata: Record<string, unknown> = {};
+                const fileParts: Array<{ buffer: Buffer; filename: string; mimetype: string }> = [];
 
                 for await (const part of parts) {
                     if (part.type === 'field') {
-                        // Processar campos de metadados
+
                         if (part.fieldname === 'metadata') {
                             try {
-                                customMetadata = JSON.parse(part.value as string);
+                                customMetadata = { ...customMetadata, ...JSON.parse(part.value as string) };
                             } catch (e) {
                                 console.error('Error parsing metadata JSON:', e);
                             }
@@ -96,49 +97,66 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
                         }
                     } else if (part.type === 'file') {
                         fileCount++;
-                        
+
                         if (fileCount > MAX_FILES) {
                             failedFiles.push({
                                 filename: part.filename,
-                                error: `Maximum number of files (${MAX_FILES}) exceeded`
+                                error: `Número máximo de arquivos (${MAX_FILES}) excedido`
                             });
                             continue;
                         }
 
                         try {
                             const buffer = await part.toBuffer();
-                            const result = await fileService.processFile(
+                            fileParts.push({
                                 buffer,
-                                part.filename,
-                                part.mimetype,
-                                customMetadata
-                            );
-                            processedFiles.push(result);
+                                filename: part.filename,
+                                mimetype: part.mimetype
+                            });
                         } catch (error) {
-                            console.error(`Error processing file ${part.filename}:`, error);
+                            console.error(`Erro ao ler arquivo ${part.filename}:`, error);
                             failedFiles.push({
                                 filename: part.filename,
-                                error: error instanceof Error ? error.message : 'Unknown error'
+                                error: error instanceof Error ? error.message : 'Erro desconhecido ao ler arquivo'
                             });
                         }
                     }
                 }
 
+
+                for (const filePart of fileParts) {
+                    try {
+                        const result = await fileService.processFile(
+                            filePart.buffer,
+                            filePart.filename,
+                            filePart.mimetype,
+                            customMetadata
+                        );
+                        processedFiles.push(result);
+                    } catch (error) {
+                        console.error(`Erro ao processar arquivo ${filePart.filename}:`, error);
+                        failedFiles.push({
+                            filename: filePart.filename,
+                            error: error instanceof Error ? error.message : 'Erro desconhecido'
+                        });
+                    }
+                }
+
                 if (processedFiles.length === 0 && failedFiles.length === 0) {
-                    return reply.code(400).send({ 
-                        success: false, 
-                        error: 'No files uploaded' 
+                    return reply.code(400).send({
+                        success: false,
+                        error: 'Nenhum arquivo foi enviado'
                     });
                 }
 
-                return reply.code(200).send({ 
-                    success: true, 
+                return reply.code(200).send({
+                    success: true,
                     data: processedFiles,
                     totalFiles: processedFiles.length + failedFiles.length,
                     failedFiles: failedFiles
                 });
             } catch (error) {
-                console.error('Error uploading files:', error);
+                console.error('Erro ao fazer upload de arquivos:', error);
                 return reply.code(500).send({
                     success: false,
                     error: error instanceof Error ? error.message : 'Unknown error'
@@ -172,7 +190,7 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
 
                 return reply.code(200).send({ success: true, results });
             } catch (error) {
-                console.error('Error searching files:', error);
+                console.error('Erro ao buscar arquivos:', error);
                 return reply.code(500).send({
                     success: false,
                     error: error instanceof Error ? error.message : 'Unknown error'
@@ -207,7 +225,7 @@ export default async function fileRoutes(fastify: FastifyInstance, options: any)
 
                 return reply.code(200).send({ success: true, results });
             } catch (error) {
-                console.error('Error performing hybrid search:', error);
+                console.error('Erro ao executar busca híbrida:', error);
                 return reply.code(500).send({
                     success: false,
                     error: error instanceof Error ? error.message : 'Unknown error'

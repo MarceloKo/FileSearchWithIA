@@ -91,7 +91,7 @@ export default async function aiRoutes(fastify: FastifyInstance, options: any) {
                     });
                 }
             } catch (error) {
-                console.error('Error in AI chat:', error);
+                console.error('Erro no chat com IA:', error);
                 return reply.code(500).send({
                     success: false,
                     error: error instanceof Error ? error.message : 'Unknown error'

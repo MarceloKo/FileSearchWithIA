@@ -12,13 +12,13 @@ export interface ProcessedFile {
     fileUrl: string;
     extractedText: string;
     chunks: number;
-    metadata: any;
+    metadata: Record<string, unknown>;
 }
 
 export interface CustomMetadata {
     path_file_external?: string;
     idempotency?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export class FileProcessingService {
@@ -43,7 +43,7 @@ export class FileProcessingService {
 
             // ACCEPT text files only .TXT OR .MD
             if (mimeType !== 'text/plain' && mimeType !== 'text/markdown') {
-                throw new Error('Only text files are supported');
+                throw new Error('Apenas arquivos de texto são suportados');
             }
 
             // 1. Extract text from the file
@@ -79,8 +79,8 @@ export class FileProcessingService {
                 metadata: { ...extractedData.metadata, ...customMetadata }
             };
         } catch (error) {
-            console.error('Error processing file:', error);
-            throw new Error(`Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error('Erro ao processar arquivo:', error);
+            throw new Error(`Falha ao processar arquivo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
     }
 

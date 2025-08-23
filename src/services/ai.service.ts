@@ -35,13 +35,13 @@ export class AIService {
 
             if (searchResults.length === 0) {
                 return {
-                    answer: "I couldn't find any relevant information in your documents.",
+                    answer: "Não consegui encontrar informações relevantes em seus documentos.",
                     sources: []
                 };
             }
 
             const context = searchResults.map((result, i) =>
-                `Document ${i + 1}: ${result.payload.metadata.filename}\n${result.payload.text}`
+                `Documento ${i + 1}: ${result.payload.metadata.filename}\n${result.payload.text}`
             ).join('\n\n');
 
             const sources = await Promise.all(
@@ -64,19 +64,19 @@ export class AIService {
                 model: config.openai.chatModel,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Context:\n${context}\n\nQuestion: ${query}` }
+                    { role: 'user', content: `Contexto:\n${context}\n\nPergunta: ${query}` }
                 ],
                 temperature: 0.3,
                 max_tokens: 5000
             });
 
             return {
-                answer: response.choices[0].message.content || "I couldn't generate a response.",
+                answer: response.choices[0].message.content || "Não consegui gerar uma resposta.",
                 sources
             };
         } catch (error) {
-            console.error('Error in AI chat:', error);
-            throw new Error('Failed to process your query');
+            console.error('Erro no chat com IA:', error);
+            throw new Error('Falha ao processar sua consulta');
         }
     }
 
@@ -104,12 +104,12 @@ export class AIService {
                 : await this.qdrantService.searchSimilar(query, filter);
 
             if (searchResults.length === 0) {
-                sendEvent({ type: 'chunk', content: "I couldn't find any relevant information in your documents." });
+                sendEvent({ type: 'chunk', content: "Não consegui encontrar informações relevantes em seus documentos." });
                 return { sources: [] };
             }
 
             const context = searchResults.map((result, i) =>
-                `Document ${i + 1}: ${result.payload.metadata.filename}\n${result.payload.text}`
+                `Documento ${i + 1}: ${result.payload.metadata.filename}\n${result.payload.text}`
             ).join('\n\n');
             const sources = (await Promise.all(
                 searchResults.map(async (result) => {
@@ -134,7 +134,7 @@ export class AIService {
                 model: config.openai.chatModel,
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Context:\n${context}\n\nQuestion: ${query}` }
+                    { role: 'user', content: `Contexto:\n${context}\n\nPergunta: ${query}` }
                 ],
                 temperature: 0.3,
                 max_tokens: 5000,
@@ -151,8 +151,8 @@ export class AIService {
 
             return { sources };
         } catch (error) {
-            console.error('Error in AI chat stream:', error);
-            throw new Error('Failed to process your query');
+            console.error('Erro no stream do chat com IA:', error);
+            throw new Error('Falha ao processar sua consulta');
         }
     }
 }
