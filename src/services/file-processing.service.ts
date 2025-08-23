@@ -50,7 +50,7 @@ export class FileProcessingService {
             const extractedData: ExtractedText = await extractTextFromBuffer(buffer, filename, mimeType);
 
             // 2. Upload the original file to MinIO
-            const fileUrl = ""//await this.minioService.uploadFile(buffer, filename, mimeType); 
+            const fileUrl = await this.minioService.uploadFile(buffer, filename, mimeType);
 
             // 3. Chunk the text
             console.log(`Chunking text...`, new Date().toISOString());
