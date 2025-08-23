@@ -11,6 +11,21 @@ export interface SearchResult {
     score: number;
 }
 
+interface QdrantPoint {
+    id: string;
+    vector: {
+        dense: number[];
+        sparse: {
+            indices: number[];
+            values: number[];
+        };
+    };
+    payload: {
+        text: string;
+        metadata: Record<string, unknown>;
+    };
+}
+
 export class QdrantService {
     private client: QdrantClient;
 
@@ -68,50 +83,68 @@ export class QdrantService {
         }
     }
 
-    async upsertVectors(chunks: TextChunk[], fileUrl: string, customMetadata?: any): Promise<void> {
+    private async processBatch(
+        chunkBatch: TextChunk[],
+        batchNum: number,
+        totalBatches: number,
+        fileUrl: string,
+        customMetadata?: Record<string, unknown>
+    ): Promise<QdrantPoint[]> {
+        console.log(`📦 Processando lote ${batchNum}/${totalBatches} (${chunkBatch.length} chunks)...`);
+
+        const texts = chunkBatch.map(chunk => chunk.text);
+        const denseEmbeddings = await generateBatchEmbeddings(texts);
+
+        const batchPoints: QdrantPoint[] = chunkBatch.map((chunk: TextChunk, index: number) => {
+            const sparseVector = sparseVectorService.createSparseVector(chunk.text);
+            const pointId = randomUUID();
+
+            return {
+                id: pointId,
+                vector: {
+                    dense: denseEmbeddings[index],
+                    sparse: {
+                        indices: sparseVector.indices,
+                        values: sparseVector.values
+                    }
+                },
+                payload: {
+                    text: chunk.text,
+                    metadata: {
+                        ...chunk.metadata,
+                        fileUrl,
+                        ...customMetadata
+                    }
+                }
+            };
+        });
+
+        console.log(`✅ Lote ${batchNum} processado com sucesso`);
+        return batchPoints;
+    }
+
+    private createBatches<T>(array: T[], batchSize: number): T[][] {
+        const batches: T[][] = [];
+        for (let i = 0; i < array.length; i += batchSize) {
+            batches.push(array.slice(i, i + batchSize));
+        }
+        return batches;
+    }
+
+    async upsertVectors(chunks: TextChunk[], fileUrl: string, customMetadata?: Record<string, unknown>): Promise<void> {
         try {
             console.log(`🚀 Processando ${chunks.length} chunks em lotes para embedding... ${new Date().toISOString()}`);
 
-            const OPENAI_BATCH_SIZE = 400;
-            const allPoints: any[] = [];
+            const OPENAI_BATCH_SIZE = 250;
+            const batches = this.createBatches(chunks, OPENAI_BATCH_SIZE);
+            const totalBatches = batches.length;
 
-            for (let i = 0; i < chunks.length; i += OPENAI_BATCH_SIZE) {
-                const chunkBatch = chunks.slice(i, i + OPENAI_BATCH_SIZE);
-                const batchNum = Math.floor(i / OPENAI_BATCH_SIZE) + 1;
-                const totalBatches = Math.ceil(chunks.length / OPENAI_BATCH_SIZE);
+            const batchPromises = batches.map((batch, index) =>
+                this.processBatch(batch, index + 1, totalBatches, fileUrl, customMetadata)
+            );
 
-                console.log(`📦 Processando lote ${batchNum}/${totalBatches} (${chunkBatch.length} chunks)...`);
-
-                const texts = chunkBatch.map(chunk => chunk.text);
-                const denseEmbeddings = await generateBatchEmbeddings(texts);
-
-                const batchPoints = chunkBatch.map((chunk: TextChunk, index: number) => {
-                    const sparseVector = sparseVectorService.createSparseVector(chunk.text);
-                    const pointId = randomUUID();
-
-                    return {
-                        id: pointId,
-                        vector: {
-                            dense: denseEmbeddings[index],
-                            sparse: {
-                                indices: sparseVector.indices,
-                                values: sparseVector.values
-                            }
-                        },
-                        payload: {
-                            text: chunk.text,
-                            metadata: {
-                                ...chunk.metadata,
-                                fileUrl,
-                                ...customMetadata
-                            }
-                        }
-                    };
-                });
-
-                allPoints.push(...batchPoints);
-                console.log(`✅ Lote ${batchNum} processado com sucesso`);
-            }
+            const batchResults = await Promise.all(batchPromises);
+            const allPoints: QdrantPoint[] = batchResults.flat();
 
             console.log(`🎯 Enviando ${allPoints.length} pontos para o Qdrant... ${new Date().toISOString()}`);
             console.log(`📏 Tamanho do vetor denso: ${allPoints[0].vector.dense.length} dimensões`);
