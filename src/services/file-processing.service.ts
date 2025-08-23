@@ -67,7 +67,10 @@ export class FileProcessingService {
             });
 
             console.log(`Upserting vectors to Qdrant...`, new Date().toISOString());
-            await this.qdrantService.upsertVectors(chunks, fileUrl, customMetadata);
+
+            // Processar metadados para busca por pasta
+            const enhancedMetadata = this.enhanceMetadataForFolderSearch(customMetadata);
+            await this.qdrantService.upsertVectors(chunks, fileUrl, enhancedMetadata);
 
             // 6. Return the processing result
             return {
@@ -90,5 +93,30 @@ export class FileProcessingService {
 
     async hybridSearchFiles(query: string, filters?: any, limit: number = 5, alpha: number = 0.5): Promise<SearchResult[]> {
         return await this.qdrantService.hybridSearch(query, filters, limit, alpha);
+    }
+
+    private enhanceMetadataForFolderSearch(customMetadata?: CustomMetadata): CustomMetadata {
+        if (!customMetadata?.path_file_external) {
+            return customMetadata || {};
+        }
+
+        const path = customMetadata.path_file_external as string;
+        const enhancedMetadata = { ...customMetadata };
+
+        // Extrair todas as pastas do caminho para permitir busca hierárquica
+        const pathParts = path.split('/').filter(part => part.length > 0);
+        const folders: string[] = [];
+
+        // Criar lista de todas as pastas possíveis
+        let currentPath = '';
+        for (const part of pathParts.slice(0, -1)) { // Excluir o nome do arquivo
+            currentPath += '/' + part;
+            folders.push(currentPath);
+        }
+
+        // Adicionar metadados de pasta para facilitar a busca
+        enhancedMetadata.folder_paths = folders;
+
+        return enhancedMetadata;
     }
 }

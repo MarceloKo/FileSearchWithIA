@@ -18,16 +18,30 @@ export class AIService {
 
     async chatWithAI(query: string, useHybridSearch: boolean = true, alpha: number = 0.5, pathFileExternal?: string): Promise<{ answer: string, sources: any[] }> {
         try {
-            const filter = pathFileExternal ? {
-                must: [
-                    {
-                        key: "metadata.path_file_external",
-                        match: {
-                            text: pathFileExternal
-                        }
-                    }
-                ]
-            } : undefined;
+            console.log("pathFileExternal", pathFileExternal);
+
+            // Criar filtro que funciona com busca por pasta
+            let filter: any = undefined;
+            if (pathFileExternal) {
+                filter = {
+                    should: [
+                        // Busca exata pelo caminho completo
+                        {
+                            key: "metadata.path_file_external",
+                            match: {
+                                text: pathFileExternal
+                            }
+                        },
+                        {
+                            key: "metadata.folder_paths",
+                            match: {
+                                text: pathFileExternal
+                            }
+                        },
+
+                    ]
+                };
+            }
 
             const searchResults = useHybridSearch
                 ? await this.qdrantService.hybridSearch(query, filter, 5, alpha)
@@ -88,16 +102,30 @@ export class AIService {
         pathFileExternal?: string
     ): Promise<{ sources: any[] }> {
         try {
-            const filter = pathFileExternal ? {
-                must: [
-                    {
-                        key: "metadata.path_file_external",
-                        match: {
-                            text: pathFileExternal
-                        }
-                    }
-                ]
-            } : undefined;
+            console.log("pathFileExternal", pathFileExternal);
+
+            // Criar filtro que funciona com busca por pasta
+            let filter: any = undefined;
+            if (pathFileExternal) {
+                filter = {
+                    should: [
+                        // Busca exata pelo caminho completo
+                        {
+                            key: "metadata.path_file_external",
+                            match: {
+                                text: pathFileExternal
+                            }
+                        },
+                        {
+                            key: "metadata.folder_paths",
+                            match: {
+                                text: pathFileExternal
+                            }
+                        },
+
+                    ]
+                };
+            }
 
             const searchResults = useHybridSearch
                 ? await this.qdrantService.hybridSearch(query, filter, 5, alpha)
